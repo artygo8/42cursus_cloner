@@ -10,4 +10,3 @@ You can also clone your 42 projects from a github repository.
 
 ## Screenshots
 ![42cursus launcher](screenshots/42cursus-launch.png "42cursus launch")
-![42cursus tree](screenshots/42cursus-tree.png "42cursus tree")
