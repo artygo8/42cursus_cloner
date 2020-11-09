@@ -1,1 +1,0 @@
-curl https://projects.intra.42.fr/projects/42cursus-minishell --output 14957.html --data "grant_type=client_credentials&client_id=4c8b6090c10edd4d18bfe036d2ddaacffd63beb223edecdb761d7ebcf0ed7edd&client_secret=61685f90ae7ec137cb916dd785cf3d7252dbfd13007d21ead5ff9c150d72f4d5"
