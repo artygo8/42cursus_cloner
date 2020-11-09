@@ -1,7 +1,9 @@
 # You can fill these, or not. (Github Prefix Example "https://github.com/$LOGIN/")
-LOGIN=agossuin
-CITY=brussels
+LOGIN=
+CITY=
 GITHUB_PREFIX=
+
+SUBJECTS_GIT="https://github.com/Kwevan/42_Subjects_2020_with_versioning.git"
 
 if [ "$1" == "-h" ]; then
   echo "Usage: ./42cursus.sh [OPTION]"
@@ -38,12 +40,38 @@ RED="\e[031m%s\e[m\n"
 GREEN="\e[032m%s\e[m\n"
 GOLD="\e[033m%s\e[m\n"
 
-printf $GOLD "Please go to this link:"
-echo "https://api.intra.42.fr/oauth/authorize?client_id=4c8b6090c10edd4d18bfe036d2ddaacffd63beb223edecdb761d7ebcf0ed7edd&redirect_uri=http%3A%2F%2Fgoogle.com&response_type=code"
-echo
+STATE=`cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`
+CODE_VERIFIER=`cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 100 | head -n 1`
+
+if which shasum ; then 
+  CODE_CHALLENGE=`echo -n $CODE_VERIFIER | shasum -a 256`
+  CODE_CHALLENGE=${CODE_CHALLENGE::(-3)}
+else
+  if which openssl; then
+    CODE_CHALLENGE=`echo -n $CODE_VERIFIER | openssl dgst -sha256`
+    CODE_CHALLENGE=${CODE_CHALLENGE:8}
+  else
+    printf $RED "please install shasum or openssl"; exit
+  fi
+fi
+
+CLIENT_ID=4c8b6090c10edd4d18bfe036d2ddaacffd63beb223edecdb761d7ebcf0ed7edd
+REDIRECT_URI=http%3A%2F%2Fgoogle.com
+
+authorize_uri="https://api.intra.42.fr/oauth/authorize?response_type=code&client_id=$CLIENT_ID&redirect_uri=$REDIRECT_URI&code_challenge=$CODE_CHALLENGE&code_challenge_method=S256&state=$STATE"
+xdg-open $authorize_uri || echo $authorize_uri
+
 printf $GOLD "Once logged in, you will be redirected to google, but in the ADRESS BAR you can find your access token."
-printf $GOLD "Paste Token: "
-read ACCESS_TOKEN
+echo -n "Paste Token: "
+read auth_code
+
+ACCESS_TOKEN=`curl -s -X POST --data "grant_type=authorization_code&code=$auth_code&redirect_uri=http%3A%2F%2Fgoogle.com&client_id=$CLIENT_ID&client_secret=61685f90ae7ec137cb916dd785cf3d7252dbfd13007d21ead5ff9c150d72f4d5&code_verifier=$CODE_VERIFIER&state=$STATE" https://api.intra.42.fr/oauth/token | jq .access_token`
+
+# If something went wrong the last time
+if [ -e srcs/tmp* ]; then
+  printf $GOLD "(cleaning up)"
+  rm -rf srcs
+fi
 
 # get_all [path] [optional_filter] 
 function get_all() {
@@ -107,6 +135,8 @@ function 42_cursus_cloner() {
 
   rm -rf projects_ids.txt
   cat my_projects.txt | while read line; do
+
+    unquoted=${line:1:(-1)}
     cat srcs/users_${user_id}_projects_users.json | jq "select(.project.name==$line) | .id" >> projects_ids.txt
 
     dir=`cat srcs/users_${user_id}_projects_users.json | jq "select(.project.name==$line) | .teams | .[0] | .project_gitlab_path"`
@@ -114,31 +144,20 @@ function 42_cursus_cloner() {
     dir=${dir#pedago_world\/42-cursus\/}
     mkdir -p $dir
 
+    printf $GOLD $dir
+
     repo=`cat srcs/users_${user_id}_projects_users.json | jq "select(.project.name==$line) | .teams | .[-1] | .repo_url"`
-    printf $GOLD "Vogsphere ${line:1:(-1)}"
+    printf $GOLD "Vogsphere $unquoted"
     git clone ${repo:1:(-1)} $dir/vogsphere-${line:1:(-1)}
+
+    # Github
     if [ ! -z $GITHUB_PREFIX ]; then
       printf $GOLD "Github ${line:1:(-1)}"
       git clone $GITHUB_PREFIX${line:1:(-1)} $dir/github-${line:1:(-1)}
     fi
+
   done
 }
-# 42_cursus_cloner
+42_cursus_cloner
 
-
-cursus_id=21 #42-cursus (new)
-# get_all cursus/$cursus_id/projects
-
-# &filter[kind]=pdf&range[id]=13000,20000
-get_all attachments "&filter[kind]=pdf&range[id]=13000,20000"
-
-# project_session_id=929
-# get_all projects/$project_session_id
-
-# project_id=1331
-# get_all projects/$project_id/attachments
-# get_all projects/$project_id/project_sessions
-# get_all projects/$project_id/projects
-# get_all projects/$project_id/scale_teams
-# get_all projects/$project_id/tags
-
+# https://aaronparecki.com/oauth-2-simplified/
